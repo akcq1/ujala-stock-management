@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Inventory & Stock Management</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+  * { -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; transition: background 0.2s, color 0.2s; }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  .modal-open { overflow: hidden; }
+  input, select, textarea { font-size: 16px !important; }
+  .fade-in { animation: fadeIn 0.2s ease-in; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .slide-up { animation: slideUp 0.3s ease-out; }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+  /* ===== Dark Mode ===== */
+  body.dark { background: #0f172a !important; color: #e2e8f0; }
+  body.dark .bg-white { background: #1e293b !important; }
+  body.dark .bg-slate-50 { background: #0f172a !important; }
+  body.dark .bg-slate-100 { background: #334155 !important; }
+  body.dark .text-slate-800, body.dark .text-slate-700 { color: #e2e8f0 !important; }
+  body.dark .text-slate-600, body.dark .text-slate-500 { color: #94a3b8 !important; }
+  body.dark .border-slate-100, body.dark .border-slate-200 { border-color: #334155 !important; }
+  body.dark .divide-slate-100 > * + * { border-color: #334155 !important; }
+  body.dark input, body.dark select, body.dark textarea { background: #0f172a; color: #e2e8f0; border-color: #334155; }
+  body.dark header { background: linear-gradient(to right, #1e3a8a, #312e81) !important; }
+  body.dark .hover\:bg-slate-100:hover, body.dark .hover\:bg-slate-50:hover { background: #334155 !important; }
+  body.dark tbody tr:hover { background: #334155 !important; }
+
+  @media print {
+    body * { visibility: hidden; }
+    #printArea, #printArea * { visibility: visible; }
+    #printArea { position: absolute; left: 0; top: 0; width: 100%; }
+    .no-print { display: none !important; }
+    body { background: white !important; }
+  }
+
+  #undoBar { transition: transform 0.3s ease-out; }
+  #undoBar.hidden { transform: translateY(150%); }
+
+  .pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #94a3b8; transition: all 0.15s; }
+  .pin-dot.filled { background: #3b82f6; border-color: #3b82f6; }
+  .pin-btn { padding: 14px 0; border-radius: 12px; font-size: 20px; font-weight: 600; background: #f1f5f9; color: #1e293b; transition: all 0.1s; }
+  .pin-btn:active { background: #dbeafe; transform: scale(0.95); }
+
+  /* PDF template */
+  .pdf-header { text-align: center; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #2563eb; }
+  .pdf-header h1 { font-size: 20px; font-weight: bold; color: #1e3a8a; margin: 0; }
+  .pdf-header h2 { font-size: 14px; font-weight: 600; color: #334155; margin: 6px 0 0 0; }
+  .pdf-header p { font-size: 11px; color: #64748b; margin: 3px 0 0 0; }
+  .pdf-meta { display: flex; justify-content: space-between; font-size: 11px; color: #475569; margin-bottom: 10px; padding: 8px 10px; background: #f1f5f9; border-radius: 6px; }
+  .pdf-summary { display: flex; gap: 8px; margin-bottom: 12px; }
+  .pdf-summary > div { flex: 1; padding: 8px; border-radius: 6px; text-align: center; }
+  .pdf-summary .lbl { font-size: 10px; color: #475569; text-transform: uppercase; }
+  .pdf-summary .val { font-size: 16px; font-weight: bold; margin-top: 2px; }
+  .pdf-summary .in-box { background: #dcfce7; } .pdf-summary .in-box .val { color: #15803d; }
+  .pdf-summary .out-box { background: #fee2e2; } .pdf-summary .out-box .val { color: #b91c1c; }
+  .pdf-summary .bal-box { background: #dbeafe; } .pdf-summary .bal-box .val { color: #1d4ed8; }
+</style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+
+<!-- ============ LOCK SCREEN ============ -->
+<div id="lockScreen" class="hidden fixed inset-0 z-[100] bg-gradient-to-br from-blue-600 to-indigo-800 flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm fade-in">
+    <div class="text-center mb-5">
+      <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      </div>
+      <h2 class="text-xl font-bold text-slate-800">Stock Manager</h2>
+      <p id="lockHint" class="text-sm text-slate-500 mt-1">Enter your PIN</p>
+    </div>
+    <div id="pinDots" class="flex justify-center gap-3 mb-5 h-5"></div>
+    <div class="grid grid-cols-3 gap-2.5">
+      <button onclick="pinPress('1')" class="pin-btn">1</button>
+      <button onclick="pinPress('2')" class="pin-btn">2</button>
+      <button onclick="pinPress('3')" class="pin-btn">3</button>
+      <button onclick="pinPress('4')" class="pin-btn">4</button>
+      <button onclick="pinPress('5')" class="pin-btn">5</button>
+      <button onclick="pinPress('6')" class="pin-btn">6</button>
+      <button onclick="pinPress('7')" class="pin-btn">7</button>
+      <button onclick="pinPress('8')" class="pin-btn">8</button>
+      <button onclick="pinPress('9')" class="pin-btn">9</button>
+      <button onclick="pinClear()" class="pin-btn text-slate-400">C</button>
+      <button onclick="pinPress('0')" class="pin-btn">0</button>
+      <button onclick="pinBack()" class="pin-btn text-slate-400">
+        <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6-6h9a2 2 0 012 2v8a2 2 0 01-2 2H9l-6-6z"/></svg>
+      </button>
+    </div>
+    <p id="pinError" class="text-center text-red-500 text-xs mt-3 h-4"></p>
+  </div>
+</div>
+
+<!-- ============ HEADER ============ -->
+<header class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg sticky top-0 z-30 no-print">
+  <div class="max-w-7xl mx-auto px-3 sm:px-4 py-3 flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2 min-w-0">
+      <svg class="w-6 h-6 sm:w-7 sm:h-7 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+      <h1 class="text-base sm:text-xl font-bold truncate">Stock Manager</h1>
+    </div>
+    <div class="flex items-center gap-0.5 sm:gap-1">
+      <button onclick="openScanner()" title="Scan Barcode" class="p-2 rounded-lg hover:bg-white/20 active:scale-95 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+      </button>
+      <button onclick="openReports()" title="Reports" class="p-2 rounded-lg hover:bg-white/20 active:scale-95 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      </button>
+      <button onclick="openBackup()" title="Backup" class="p-2 rounded-lg hover:bg-white/20 active:scale-95 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+      </button>
+      <button onclick="openPinSettings()" title="PIN Lock" class="p-2 rounded-lg hover:bg-white/20 active:scale-95 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      </button>
+      <button onclick="toggleDark()" title="Dark Mode" class="p-2 rounded-lg hover:bg-white/20 active:scale-95 transition">
+        <svg id="darkIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+      </button>
+      <button onclick="lockNow()" title="Lock" class="p-2 rounded-lg hover:bg-white/20 active:scale-95 transition hidden" id="lockNowBtn">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>
+      </button>
+      <button onclick="openAddProduct()" class="bg-white text-blue-700 px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-blue-50 active:scale-95 transition flex items-center gap-1 ml-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span class="hidden sm:inline">Add</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-3 sm:px-4 py-4">
+
+  <!-- Dashboard -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+    <div class="bg-white rounded-xl p-3 sm:p-4 shadow-sm border-l-4 border-blue-500">
+      <p class="text-xs text-slate-500 font-medium">Total Products</p>
+      <p id="statProducts" class="text-2xl sm:text-3xl font-bold text-slate-800">0</p>
+    </div>
+    <div class="bg-white rounded-xl p-3 sm:p-4 shadow-sm border-l-4 border-green-500">
+      <p class="text-xs text-slate-500 font-medium">Total Quantity</p>
+      <p id="statQty" class="text-2xl sm:text-3xl font-bold text-slate-800">0</p>
+    </div>
+    <div class="bg-white rounded-xl p-3 sm:p-4 shadow-sm border-l-4 border-yellow-500">
+      <p class="text-xs text-slate-500 font-medium">Low Stock</p>
+      <p id="statLow" class="text-2xl sm:text-3xl font-bold text-yellow-600">0</p>
+    </div>
+    <div class="bg-white rounded-xl p-3 sm:p-4 shadow-sm border-l-4 border-red-500">
+      <p class="text-xs text-slate-500 font-medium">Out of Stock</p>
+      <p id="statOut" class="text-2xl sm:text-3xl font-bold text-red-600">0</p>
+    </div>
+  </div>
+
+  <!-- Search + Filter -->
+  <div class="bg-white rounded-xl shadow-sm p-3 mb-4">
+    <div class="relative mb-3">
+      <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <input id="searchInput" type="text" placeholder="Search by Product Type, Colour or Size..." 
+        class="w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm">
+    </div>
+    <div class="flex flex-wrap items-center gap-2 text-xs mb-2">
+      <span class="text-slate-500 font-medium">Filter:</span>
+      <button onclick="setStockFilter('all')" data-filter="all" class="stock-filter px-3 py-1.5 rounded-full font-semibold bg-blue-100 text-blue-700">All</button>
+      <button onclick="setStockFilter('low')" data-filter="low" class="stock-filter px-3 py-1.5 rounded-full font-semibold bg-slate-100 text-slate-600">Low</button>
+      <button onclick="setStockFilter('out')" data-filter="out" class="stock-filter px-3 py-1.5 rounded-full font-semibold bg-slate-100 text-slate-600">Out</button>
+      <button onclick="setStockFilter('in')" data-filter="in" class="stock-filter px-3 py-1.5 rounded-full font-semibold bg-slate-100 text-slate-600">In Stock</button>
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <select id="filterSize" onchange="renderProducts()" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+        <option value="">All Sizes</option>
+      </select>
+      <select id="filterColour" onchange="renderProducts()" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+        <option value="">All Colours</option>
+      </select>
+    </div>
+    <button onclick="clearAllFilters()" class="text-xs text-blue-600 hover:underline font-medium mt-2">Clear all filters</button>
+  </div>
+
+  <!-- Inventory Table -->
+  <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+      <h2 class="font-bold text-slate-700">Product Inventory</h2>
+      <span id="filteredCount" class="text-xs text-slate-500"></span>
+    </div>
+    <div class="overflow-x-auto scrollbar-thin">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
+          <tr>
+            <th class="px-2 py-3 text-left font-semibold">SL</th>
+            <th class="px-2 py-3 text-left font-semibold">Product Type</th>
+            <th class="px-2 py-3 text-left font-semibold">Colour</th>
+            <th class="px-2 py-3 text-left font-semibold">Size</th>
+            <th class="px-2 py-3 text-right font-semibold">Qty</th>
+            <th class="px-2 py-3 text-center font-semibold">Action</th>
+          </tr>
+        </thead>
+        <tbody id="productTableBody" class="divide-y divide-slate-100"></tbody>
+      </table>
+    </div>
+    <div id="emptyState" class="hidden text-center py-12 text-slate-400">
+      <svg class="w-16 h-16 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+      <p class="text-sm">No products found</p>
+    </div>
+  </div>
+</main>
+
+<!-- ============ Add/Edit Product ============ -->
+<div id="addProductModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+  <div class="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto scrollbar-thin slide-up">
+    <div class="sticky top-0 bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between z-10">
+      <h3 id="productModalTitle" class="font-bold text-slate-800">Add New Product</h3>
+      <button onclick="closeAddProduct()" class="p-1.5 hover:bg-slate-100 rounded-lg">
+        <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="addProductForm" class="p-4 space-y-3">
+      <input type="hidden" id="editProductId">
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Product Type *</label>
+        <input id="inputType" type="text" required placeholder="e.g. Paints, Primer, Colorant"
+          class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Colour</label>
+          <input id="inputColour" type="text" placeholder="Red"
+            class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Size</label>
+          <input id="inputSize" type="text" placeholder="4L"
+            class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+        </div>
+      </div>
+      <div id="openingQtyWrap">
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Opening Quantity</label>
+        <input id="inputQty" type="number" min="0" value="0"
+          class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Low Stock Alert Level</label>
+        <input id="inputThreshold" type="number" min="0" value="5"
+          class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Barcode / SKU (optional)</label>
+        <input id="inputBarcode" type="text" placeholder="Scan or type"
+          class="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+      </div>
+      <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 active:scale-[0.98] transition">Save Product</button>
+    </form>
+  </div>
+</div>
+
+<!-- ============ Ledger Modal ============ -->
+<div id="ledgerModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+  <div class="bg-white w-full sm:max-w-4xl sm:rounded-2xl rounded-t-2xl max-h-[95vh] flex flex-col slide-up">
+    <div class="bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-3 sm:px-4 py-3 rounded-t-2xl flex items-start justify-between no-print">
+      <div class="flex-1 min-w-0">
+        <h3 id="ledgerTitle" class="font-bold truncate text-sm sm:text-base">Product Ledger</h3>
+        <div class="flex gap-2 mt-2 flex-wrap">
+          <span class="text-[10px] sm:text-xs bg-white/20 px-2 py-0.5 rounded-full">Bal: <b id="ledgerBalance">0</b></span>
+          <span class="text-[10px] sm:text-xs bg-white/20 px-2 py-0.5 rounded-full">Entries: <b id="ledgerCount">0</b></span>
+          <span class="text-[10px] sm:text-xs bg-white/20 px-2 py-0.5 rounded-full">IN: <b id="ledgerTotalIn">0</b></span>
+          <span class="text-[10px] sm:text-xs bg-white/20 px-2 py-0.5 rounded-full">OUT: <b id="ledgerTotalOut">0</b></span>
+        </div>
+      </div>
+      <div class="flex items-center gap-0.5 ml-2 flex-shrink-0">
+        <button onclick="editCurrentProduct()" title="Edit Product" class="p-1.5 hover:bg-white/20 rounded-lg">
+          <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        </button>
+        <button onclick="printLedger()" title="Print" class="p-1.5 hover:bg-white/20 rounded-lg">
+          <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+        </button>
+        <button onclick="downloadLedgerPDF()" title="Download PDF" class="p-1.5 hover:bg-white/20 rounded-lg">
+          <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        </button>
+        <button onclick="exportLedgerCSV()" title="Export CSV" class="p-1.5 hover:bg-white/20 rounded-lg">
+          <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        </button>
+        <button onclick="deleteCurrentProduct()" title="Delete Product" class="p-1.5 hover:bg-white/20 rounded-lg">
+          <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+        <button onclick="closeLedger()" class="p-1.5 hover:bg-white/20 rounded-lg">
+          <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="p-3 border-b border-slate-100 bg-slate-50 no-print">
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <button onclick="setTxType('IN')" id="btnIN" class="py-2 rounded-lg font-semibold text-sm border-2 transition bg-green-50 border-green-500 text-green-700">↑ Stock IN</button>
+        <button onclick="setTxType('OUT')" id="btnOUT" class="py-2 rounded-lg font-semibold text-sm border-2 transition border-slate-200 text-slate-600">↓ Stock OUT</button>
+      </div>
+      <form id="txForm" class="grid grid-cols-12 gap-2">
+        <div class="col-span-6 sm:col-span-3">
+          <input id="txDate" type="date" required class="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div class="col-span-6 sm:col-span-2">
+          <input id="txQty" type="number" min="1" required placeholder="Qty" class="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div class="col-span-12 sm:col-span-3">
+          <input id="txInvoice" type="text" placeholder="Invoice # (optional)" class="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div class="col-span-12 sm:col-span-4">
+          <input id="txNote" type="text" placeholder="Note (optional)" class="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div class="col-span-12">
+          <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-blue-700 active:scale-95 transition">Add Entry</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="px-3 py-2 border-b border-slate-100 bg-white flex flex-wrap items-center gap-2 no-print">
+      <span class="text-xs text-slate-500 font-medium">Date:</span>
+      <input id="ledgerFrom" type="date" onchange="renderLedger()" class="px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+      <span class="text-xs text-slate-400">to</span>
+      <input id="ledgerTo" type="date" onchange="renderLedger()" class="px-2 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+      <button onclick="clearLedgerFilter()" class="text-xs text-blue-600 hover:underline font-medium">Clear</button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto scrollbar-thin" id="printArea">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600 text-xs uppercase sticky top-0">
+          <tr>
+            <th class="px-2 py-2 text-left">Date</th>
+            <th class="px-2 py-2 text-center">Type</th>
+            <th class="px-2 py-2 text-right">Qty</th>
+            <th class="px-2 py-2 text-right">Bal</th>
+            <th class="px-2 py-2 text-left hidden sm:table-cell">Invoice</th>
+            <th class="px-2 py-2 text-left hidden sm:table-cell">Note</th>
+            <th class="px-2 py-2 text-center no-print">Action</th>
+          </tr>
+        </thead>
+        <tbody id="ledgerTableBody" class="divide-y divide-slate-100"></tbody>
+      </table>
+      <div id="ledgerEmpty" class="hidden text-center py-10 text-slate-400 text-sm">No transactions yet.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Edit Transaction ============ -->
+<div id="editTxModal" class="hidden fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-sm w-full p-5 fade-in max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-bold text-slate-800">Edit Transaction</h3>
+      <button onclick="closeEditTx()" class="p-1 hover:bg-slate-100 rounded-lg">
+        <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="editTxForm" class="space-y-3">
+      <input type="hidden" id="editTxId">
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Type</label>
+        <select id="editTxType" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          <option value="IN">Stock IN</option>
+          <option value="OUT">Stock OUT</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Date</label>
+        <input id="editTxDate" type="date" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Quantity</label>
+        <input id="editTxQty" type="number" min="1" required class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Invoice #</label>
+        <input id="editTxInvoice" type="text" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Note</label>
+        <input id="editTxNote" type="text" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button type="button" onclick="closeEditTx()" class="flex-1 py-2.5 rounded-lg border border-slate-200 font-semibold text-sm hover:bg-slate-50">Cancel</button>
+        <button type="submit" class="flex-1 py-2.5 rounded-lg bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ PIN Settings ============ -->
+<div id="pinSettingsModal" class="hidden fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-sm w-full p-5 fade-in">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold text-slate-800">🔒 PIN Lock Settings</h3>
+      <button onclick="closePinSettings()" class="p-1 hover:bg-slate-100 rounded-lg">
+        <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="pinStatus" class="text-sm mb-4 p-3 rounded-lg"></div>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">New PIN (4-6 digits)</label>
+        <input id="pinNew" type="password" inputmode="numeric" maxlength="6" placeholder="••••"
+          class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none text-center tracking-widest">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Confirm PIN</label>
+        <input id="pinConfirm" type="password" inputmode="numeric" maxlength="6" placeholder="••••"
+          class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none text-center tracking-widest">
+      </div>
+      <button onclick="savePin()" id="pinSaveBtn" class="w-full py-2.5 rounded-lg bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700">Set PIN</button>
+      <button onclick="removePin()" id="pinRemoveBtn" class="w-full py-2.5 rounded-lg bg-red-50 text-red-600 font-semibold text-sm hover:bg-red-100 border border-red-200 hidden">Remove PIN</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Confirm ============ -->
+<div id="confirmModal" class="hidden fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-sm w-full p-5 fade-in">
+    <h3 class="font-bold text-slate-800 mb-2">Are you sure?</h3>
+    <p id="confirmMsg" class="text-sm text-slate-600 mb-4">This action cannot be undone.</p>
+    <div class="flex gap-2">
+      <button onclick="closeConfirm()" class="flex-1 py-2.5 rounded-lg border border-slate-200 font-semibold text-sm hover:bg-slate-50">Cancel</button>
+      <button id="confirmBtn" class="flex-1 py-2.5 rounded-lg bg-red-600 text-white font-semibold text-sm hover:bg-red-700">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Reports ============ -->
+<div id="reportsModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+  <div class="bg-white w-full sm:max-w-3xl sm:rounded-2xl rounded-t-2xl max-h-[95vh] flex flex-col slide-up">
+    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-3 rounded-t-2xl flex items-center justify-between">
+      <h3 class="font-bold">📊 Reports</h3>
+      <button onclick="closeReports()" class="p-1.5 hover:bg-white/20 rounded-lg">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-4">
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <span class="text-slate-500 font-medium">Period:</span>
+        <select id="reportPeriod" onchange="renderReports()" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="365">Last 1 year</option>
+          <option value="all">All time</option>
+        </select>
+      </div>
+      <div id="reportStats" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+      <div class="bg-white rounded-xl border border-slate-100 p-3">
+        <h4 class="font-bold text-slate-700 mb-2 text-sm">🏆 Top Products (by Stock OUT)</h4>
+        <div id="topProducts" class="space-y-2"></div>
+      </div>
+      <div class="bg-white rounded-xl border border-slate-100 p-3">
+        <h4 class="font-bold text-slate-700 mb-2 text-sm">📈 Recent Activity</h4>
+        <div id="recentActivity" class="space-y-1 text-xs max-h-64 overflow-y-auto"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="exportAllCSV()" class="py-2.5 rounded-lg bg-green-600 text-white font-semibold text-sm hover:bg-green-700">📥 Export All CSV</button>
+        <button onclick="exportBackupJSON()" class="py-2.5 rounded-lg bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700">💾 Backup JSON</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Backup ============ -->
+<div id="backupModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full p-5 fade-in">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold text-slate-800">💾 Backup & Restore</h3>
+      <button onclick="closeBackup()" class="p-1 hover:bg-slate-100 rounded-lg">
+        <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="space-y-3">
+      <button onclick="exportBackupJSON()" class="w-full py-3 rounded-lg bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 flex items-center justify-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        Download Backup (JSON)
+      </button>
+      <div class="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center">
+        <p class="text-xs text-slate-500 mb-2">Restore from backup file</p>
+        <input id="restoreFile" type="file" accept=".json" onchange="restoreBackup(event)" class="w-full text-xs">
+      </div>
+      <div class="text-xs text-slate-500 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+        ⚠️ Restore করলে বর্তমান সব ডাটা মুছে যাবে।
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Scanner ============ -->
+<div id="scannerModal" class="hidden fixed inset-0 bg-black/90 z-[80] flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full overflow-hidden fade-in">
+    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+      <h3 class="font-bold text-slate-800">📷 Scan Barcode / QR</h3>
+      <button onclick="closeScanner()" class="p-1.5 hover:bg-slate-100 rounded-lg">
+        <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="scannerReader" class="w-full bg-black"></div>
+    <div class="p-3 text-xs text-slate-500 text-center">ক্যামেরা অনুমতি প্রয়োজন।</div>
+  </div>
+</div>
+
+<!-- ============ Undo ============ -->
+<div id="undoBar" class="hidden fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm bg-slate-800 text-white rounded-xl shadow-2xl p-3 flex items-center gap-3 z-[75]">
+  <svg class="w-5 h-5 flex-shrink-0 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+  <span id="undoMsg" class="text-sm flex-1">Item deleted</span>
+  <button onclick="performUndo()" class="bg-yellow-500 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-yellow-400">UNDO</button>
+</div>
+
+<!-- ============ Toast ============ -->
+<div id="toast" class="hidden fixed bottom-24 left-1/2 -translate-x-1/2 z-[90] bg-slate-800 text-white px-4 py-2.5 rounded-lg text-sm shadow-lg"></div>
+
+<!-- ============ PDF Loading Overlay ============ -->
+<div id="pdfLoading" class="hidden fixed inset-0 bg-black/70 z-[95] flex items-center justify-center">
+  <div class="bg-white rounded-2xl p-6 text-center">
+    <svg class="w-10 h-10 mx-auto text-blue-600 animate-spin mb-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+    <p class="text-sm text-slate-600">Generating PDF...</p>
+  </div>
+</div>
+
+<script>
+/* ============================
+   DATA LAYER
+   ============================ */
+const STORAGE_KEY = 'inventory_app_data_v1';
+const PIN_KEY = 'inventory_pin';
+const DARK_KEY = 'inventory_dark';
+
+let state = {
+  products: [],
+  transactions: [],
+  currentLedgerId: null,
+  txType: 'IN',
+  stockFilter: 'all',
+  darkMode: false,
+  undoStack: null
+};
+
+let pinBuffer = '';
+let pinAttempts = 0;
+let pinLockedUntil = 0;
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      state.products = parsed.products || [];
+      state.transactions = parsed.transactions || [];
+    }
+    state.darkMode = localStorage.getItem(DARK_KEY) === '1';
+  } catch (e) { console.error(e); }
+}
+
+function saveData() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      products: state.products,
+      transactions: state.transactions
+    }));
+  } catch (e) { showToast('⚠️ Failed to save'); }
+}
+
+/* ============================
+   HELPERS
+   ============================ */
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return dateStr;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.add('hidden'), 2200);
+}
+
+function getProductBalance(productId) {
+  let bal = 0;
+  state.transactions
+    .filter(tx => tx.productId === productId)
+    .sort((a, b) => (a.date + a.createdAt).localeCompare(b.date + b.createdAt))
+    .forEach(tx => { bal += tx.type === 'IN' ? Number(tx.qty) : -Number(tx.qty); });
+  return bal;
+}
+
+function getThreshold(p) { return typeof p.threshold === 'number' ? p.threshold : 5; }
+
+function getProductStats() {
+  let totalQty = 0, low = 0, out = 0;
+  state.products.forEach(p => {
+    const bal = getProductBalance(p.id);
+    totalQty += bal;
+    if (bal <= 0) out++;
+    else if (bal <= getThreshold(p)) low++;
+  });
+  return { total: state.products.length, totalQty, low, out };
+}
+
+/* ============================
+   PIN LOCK
+   ============================ */
+function getPin() { return localStorage.getItem(PIN_KEY); }
+function hasPin() { return !!getPin(); }
+
+function lockNow() {
+  if (!hasPin()) { showToast('⚠️ Set a PIN first'); return; }
+  pinBuffer = '';
+  renderPinDots();
+  document.getElementById('lockScreen').classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  document.getElementById('lockHint').textContent = 'Enter your PIN';
+  document.getElementById('pinError').textContent = '';
+}
+
+function unlockApp() {
+  document.getElementById('lockScreen').classList.add('hidden');
+  document.body.classList.remove('modal-open');
+  pinBuffer = '';
+  pinAttempts = 0;
+}
+
+function pinPress(digit) {
+  if (pinBuffer.length >= 6) return;
+  pinBuffer += digit;
+  renderPinDots();
+  const stored = getPin();
+  if (stored && pinBuffer.length === stored.length) setTimeout(checkPin, 120);
+}
+
+function pinBack() { pinBuffer = pinBuffer.slice(0, -1); renderPinDots(); }
+function pinClear() { pinBuffer = ''; renderPinDots(); }
+
+function renderPinDots() {
+  const stored = getPin();
+  const len = stored ? stored.length : 4;
+  const container = document.getElementById('pinDots');
+  let html = '';
+  for (let i = 0; i < len; i++) {
+    html += `<div class="pin-dot ${i < pinBuffer.length ? 'filled' : ''}"></div>`;
+  }
+  container.innerHTML = html;
+}
+
+function checkPin() {
+  const stored = getPin();
+  if (!stored) return;
+  if (Date.now() < pinLockedUntil) {
+    const secs = Math.ceil((pinLockedUntil - Date.now()) / 1000);
+    document.getElementById('pinError').textContent = `Too many attempts. Wait ${secs}s`;
+    pinBuffer = ''; renderPinDots();
+    return;
+  }
+  if (pinBuffer === stored) {
+    pinAttempts = 0;
+    unlockApp();
+    showToast('🔓 Unlocked');
+  } else {
+    pinAttempts++;
+    document.getElementById('pinError').textContent = `Wrong PIN (${pinAttempts}/5)`;
+    pinBuffer = ''; renderPinDots();
+    if (pinAttempts >= 5) {
+      pinLockedUntil = Date.now() + 30000;
+      pinAttempts = 0;
+      document.getElementById('pinError').textContent = 'Locked for 30 seconds';
+      setTimeout(() => {
+        if (Date.now() >= pinLockedUntil && getPin()) {
+          document.getElementById('pinError').textContent = '';
+        }
+      }, 30000);
+    }
+  }
+}
+
+function openPinSettings() {
+  updatePinSettingsUI();
+  document.getElementById('pinSettingsModal').classList.remove('hidden');
+  document.getElementById('pinNew').value = '';
+  document.getElementById('pinConfirm').value = '';
+}
+
+function closePinSettings() {
+  document.getElementById('pinSettingsModal').classList.add('hidden');
+}
+
+function updatePinSettingsUI() {
+  const has = hasPin();
+  const status = document.getElementById('pinStatus');
+  const removeBtn = document.getElementById('pinRemoveBtn');
+  const saveBtn = document.getElementById('pinSaveBtn');
+  if (has) {
+    status.className = 'text-sm mb-4 p-3 rounded-lg bg-green-50 text-green-700 border border-green-200';
+    status.textContent = '✅ PIN is active. Change or remove below.';
+    removeBtn.classList.remove('hidden');
+    saveBtn.textContent = 'Change PIN';
+  } else {
+    status.className = 'text-sm mb-4 p-3 rounded-lg bg-slate-50 text-slate-600 border border-slate-200';
+    status.textContent = '🔓 PIN is not set. Set a PIN to lock the app.';
+    removeBtn.classList.add('hidden');
+    saveBtn.textContent = 'Set PIN';
+  }
+}
+
+function savePin() {
+  const pin = document.getElementById('pinNew').value.trim();
+  const confirm = document.getElementById('pinConfirm').value.trim();
+  if (!/^\d{4,6}$/.test(pin)) { showToast('⚠️ PIN must be 4-6 digits'); return; }
+  if (pin !== confirm) { showToast('⚠️ PINs do not match'); return; }
+  localStorage.setItem(PIN_KEY, pin);
+  updatePinSettingsUI();
+  document.getElementById('pinNew').value = '';
+  document.getElementById('pinConfirm').value = '';
+  document.getElementById('lockNowBtn').classList.remove('hidden');
+  showToast('✅ PIN saved');
+}
+
+function removePin() {
+  showConfirm('Remove PIN lock?', () => {
+    localStorage.removeItem(PIN_KEY);
+    updatePinSettingsUI();
+    document.getElementById('lockNowBtn').classList.add('hidden');
+    showToast('🔓 PIN removed');
+  });
+}
+
+/* ============================
+   UNDO
+   ============================ */
+let undoTimer = null;
+function pushUndo(action, data, msg) {
+  state.undoStack = { action, data, timestamp: Date.now() };
+  document.getElementById('undoMsg').textContent = msg;
+  const bar = document.getElementById('undoBar');
+  bar.classList.remove('hidden');
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => {
+    bar.classList.add('hidden');
+    state.undoStack = null;
+  }, 5000);
+}
+
+function performUndo() {
+  if (!state.undoStack) return;
+  const { action, data } = state.undoStack;
+  if (action === 'deleteTx') {
+    state.transactions.push(data.tx);
+  } else if (action === 'deleteProduct') {
+    state.products.push(data.product);
+    state.transactions.push(...data.txs);
+  }
+  saveData();
+  renderAll();
+  if (state.currentLedgerId) renderLedger();
+  document.getElementById('undoBar').classList.add('hidden');
+  state.undoStack = null;
+  showToast('↩️ Restored');
+}
+
+/* ============================
+   DARK MODE
+   ============================ */
+function toggleDark() {
+  state.darkMode = !state.darkMode;
+  applyDark();
+  localStorage.setItem(DARK_KEY, state.darkMode ? '1' : '0');
+}
+
+function applyDark() {
+  document.body.classList.toggle('dark', state.darkMode);
+  const icon = document.getElementById('darkIcon');
+  if (state.darkMode) {
+    icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>';
+  } else {
+    icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>';
+  }
+}
+
+/* ============================
+   DASHBOARD
+   ============================ */
+function renderDashboard() {
+  const stats = getProductStats();
+  document.getElementById('statProducts').textContent = stats.total;
+  document.getElementById('statQty').textContent = stats.totalQty;
+  document.getElementById('statLow').textContent = stats.low;
+  document.getElementById('statOut').textContent = stats.out;
+}
+
+/* ============================
+   FILTERS
+   ============================ */
+function setStockFilter(f) {
+  state.stockFilter = f;
+  document.querySelectorAll('.stock-filter').forEach(btn => {
+    const active = btn.dataset.filter === f;
+    btn.className = 'stock-filter px-3 py-1.5 rounded-full font-semibold ' +
+      (active ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600');
+  });
+  renderProducts();
+}
+
+function clearAllFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('filterSize').value = '';
+  document.getElementById('filterColour').value = '';
+  setStockFilter('all');
+}
+
+function refreshFilterOptions() {
+  const sizeSel = document.getElementById('filterSize');
+  const colourSel = document.getElementById('filterColour');
+  if (!sizeSel || !colourSel) return;
+  const curSize = sizeSel.value;
+  const curColour = colourSel.value;
+  const sizes = [...new Set(state.products.map(p => p.size).filter(Boolean))].sort();
+  const colours = [...new Set(state.products.map(p => p.colour).filter(Boolean))].sort();
+  sizeSel.innerHTML = '<option value="">All Sizes</option>' +
+    sizes.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  colourSel.innerHTML = '<option value="">All Colours</option>' +
+    colours.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  if (sizes.includes(curSize)) sizeSel.value = curSize;
+  if (colours.includes(curColour)) colourSel.value = curColour;
+}
+
+/* ============================
+   PRODUCT TABLE
+   ============================ */
+function renderProducts() {
+  const query = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+  const sizeFilter = document.getElementById('filterSize').value || '';
+  const colourFilter = document.getElementById('filterColour').value || '';
+  const tbody = document.getElementById('productTableBody');
+  const emptyState = document.getElementById('emptyState');
+  const filteredCount = document.getElementById('filteredCount');
+
+  let products = state.products.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+  if (query) {
+    products = products.filter(p =>
+      `${p.type} ${p.colour} ${p.size} ${p.barcode||''}`.toLowerCase().includes(query)
+    );
+  }
+  if (sizeFilter) products = products.filter(p => p.size === sizeFilter);
+  if (colourFilter) products = products.filter(p => p.colour === colourFilter);
+
+  if (state.stockFilter !== 'all') {
+    products = products.filter(p => {
+      const bal = getProductBalance(p.id);
+      const th = getThreshold(p);
+      if (state.stockFilter === 'out') return bal <= 0;
+      if (state.stockFilter === 'low') return bal > 0 && bal <= th;
+      if (state.stockFilter === 'in') return bal > th;
+      return true;
+    });
+  }
+
+  const hasFilter = query || state.stockFilter !== 'all' || sizeFilter || colourFilter;
+  filteredCount.textContent = hasFilter ? `${products.length} found` : '';
+
+  if (products.length === 0) {
+    tbody.innerHTML = '';
+    emptyState.classList.remove('hidden');
+    return;
+  }
+  emptyState.classList.add('hidden');
+
+  tbody.innerHTML = products.map((p, idx) => {
+    const bal = getProductBalance(p.id);
+    const th = getThreshold(p);
+    let qtyClass = 'text-slate-800 font-semibold';
+    let qtyBadge = '';
+    if (bal <= 0) {
+      qtyClass = 'text-red-600 font-bold';
+      qtyBadge = '<span class="ml-1 text-[9px] bg-red-100 text-red-700 px-1 py-0.5 rounded">OUT</span>';
+    } else if (bal <= th) {
+      qtyClass = 'text-yellow-600 font-bold';
+      qtyBadge = '<span class="ml-1 text-[9px] bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded">LOW</span>';
+    }
+    return `
+      <tr class="hover:bg-blue-50/50 transition cursor-pointer" onclick="openLedger('${p.id}')">
+        <td class="px-2 py-3 text-slate-500 text-xs">${idx + 1}</td>
+        <td class="px-2 py-3 font-medium text-slate-800 text-xs sm:text-sm">${escapeHtml(p.type)}</td>
+        <td class="px-2 py-3 text-slate-600 text-xs sm:text-sm">${escapeHtml(p.colour) || '<span class="text-slate-300">—</span>'}</td>
+        <td class="px-2 py-3 text-slate-600 text-xs sm:text-sm">${escapeHtml(p.size) || '<span class="text-slate-300">—</span>'}</td>
+        <td class="px-2 py-3 text-right ${qtyClass} text-xs sm:text-sm">${bal}${qtyBadge}</td>
+        <td class="px-2 py-3 text-center">
+          <button onclick="event.stopPropagation(); openLedger('${p.id}')" 
+            class="inline-flex items-center justify-center w-8 h-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition active:scale-90"
+            title="View Ledger">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+/* ============================
+   ADD / EDIT PRODUCT
+   ============================ */
+function openAddProduct() {
+  document.getElementById('productModalTitle').textContent = 'Add New Product';
+  document.getElementById('addProductForm').reset();
+  document.getElementById('editProductId').value = '';
+  document.getElementById('inputQty').value = '0';
+  document.getElementById('inputThreshold').value = '5';
+  document.getElementById('openingQtyWrap').style.display = '';
+  document.getElementById('addProductModal').classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  setTimeout(() => document.getElementById('inputType').focus(), 100);
+}
+
+function closeAddProduct() {
+  document.getElementById('addProductModal').classList.add('hidden');
+  document.body.classList.remove('modal-open');
+}
+
+function editCurrentProduct() {
+  const p = state.products.find(x => x.id === state.currentLedgerId);
+  if (!p) return;
+  document.getElementById('productModalTitle').textContent = 'Edit Product';
+  document.getElementById('editProductId').value = p.id;
+  document.getElementById('inputType').value = p.type || '';
+  document.getElementById('inputColour').value = p.colour || '';
+  document.getElementById('inputSize').value = p.size || '';
+  document.getElementById('inputThreshold').value = getThreshold(p);
+  document.getElementById('inputBarcode').value = p.barcode || '';
+  document.getElementById('openingQtyWrap').style.display = 'none';
+  closeLedger();
+  document.getElementById('addProductModal').classList.remove('hidden');
+  document.body.classList.add('modal-open');
+}
+
+document.getElementById('addProductForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const editId = document.getElementById('editProductId').value;
+  const type = document.getElementById('inputType').value.trim();
+  const colour = document.getElementById('inputColour').value.trim();
+  const size = document.getElementById('inputSize').value.trim();
+  const qty = parseFloat(document.getElementById('inputQty').value) || 0;
+  const threshold = parseFloat(document.getElementById('inputThreshold').value);
+  const barcode = document.getElementById('inputBarcode').value.trim();
+
+  if (!type) { showToast('⚠️ Product Type required'); return; }
+
+  if (editId) {
+    const p = state.products.find(x => x.id === editId);
+    if (p) {
+      p.type = type; p.colour = colour; p.size = size;
+      p.threshold = isNaN(threshold) ? 5 : threshold;
+      p.barcode = barcode;
+      saveData();
+      closeAddProduct();
+      renderAll();
+      showToast('✅ Product updated');
+    }
+  } else {
+    const product = {
+      id: uid(), type, colour, size,
+      threshold: isNaN(threshold) ? 5 : threshold,
+      barcode, createdAt: Date.now()
+    };
+    state.products.push(product);
+    if (qty > 0) {
+      state.transactions.push({
+        id: uid(), productId: product.id, date: todayStr(),
+        type: 'IN', qty, note: 'Opening stock', invoice: '', createdAt: Date.now()
+      });
+    }
+    saveData();
+    closeAddProduct();
+    this.reset();
+    document.getElementById('inputQty').value = '0';
+    renderAll();
+    showToast('✅ Product added');
+  }
+});
+
+function deleteCurrentProduct() {
+  const p = state.products.find(x => x.id === state.currentLedgerId);
+  if (!p) return;
+  showConfirm(`Delete "${p.type}" and all its transactions?`, () => {
+    const idx = state.products.findIndex(x => x.id === p.id);
+    const removedProduct = state.products[idx];
+    const removedTxs = state.transactions.filter(t => t.productId === p.id);
+    state.products.splice(idx, 1);
+    state.transactions = state.transactions.filter(t => t.productId !== p.id);
+    saveData();
+    closeLedger();
+    renderAll();
+    pushUndo('deleteProduct', { product: removedProduct, txs: removedTxs }, `Deleted "${p.type}"`);
+  });
+}
+
+/* ============================
+   LEDGER
+   ============================ */
+function openLedger(productId) {
+  const product = state.products.find(p => p.id === productId);
+  if (!product) return;
+  state.currentLedgerId = productId;
+
+  const parts = [product.type];
+  if (product.colour) parts.push(`• ${product.colour}`);
+  if (product.size) parts.push(`• ${product.size}`);
+  document.getElementById('ledgerTitle').textContent = parts.join(' ');
+
+  document.getElementById('txDate').value = todayStr();
+  document.getElementById('txQty').value = '';
+  document.getElementById('txNote').value = '';
+  document.getElementById('txInvoice').value = '';
+  document.getElementById('ledgerFrom').value = '';
+  document.getElementById('ledgerTo').value = '';
+  setTxType('IN');
+  renderLedger();
+  document.getElementById('ledgerModal').classList.remove('hidden');
+  document.body.classList.add('modal-open');
+}
+
+function closeLedger() {
+  document.getElementById('ledgerModal').classList.add('hidden');
+  document.body.classList.remove('modal-open');
+  state.currentLedgerId = null;
+  renderAll();
+}
+
+function setTxType(type) {
+  state.txType = type;
+  const btnIN = document.getElementById('btnIN');
+  const btnOUT = document.getElementById('btnOUT');
+  if (type === 'IN') {
+    btnIN.className = 'py-2 rounded-lg font-semibold text-sm border-2 transition bg-green-50 border-green-500 text-green-700';
+    btnOUT.className = 'py-2 rounded-lg font-semibold text-sm border-2 transition border-slate-200 text-slate-600';
+  } else {
+    btnOUT.className = 'py-2 rounded-lg font-semibold text-sm border-2 transition bg-red-50 border-red-500 text-red-700';
+    btnIN.className = 'py-2 rounded-lg font-semibold text-sm border-2 transition border-slate-200 text-slate-600';
+  }
+}
+
+function clearLedgerFilter() {
+  document.getElementById('ledgerFrom').value = '';
+  document.getElementById('ledgerTo').value = '';
+  renderLedger();
+}
+
+function renderLedger() {
+  const productId = state.currentLedgerId;
+  if (!productId) return;
+  const from = document.getElementById('ledgerFrom').value;
+  const to = document.getElementById('ledgerTo').value;
+
+  let txs = state.transactions
+    .filter(tx => tx.productId === productId)
+    .sort((a, b) => {
+      const cmp = (a.date || '').localeCompare(b.date || '');
+      return cmp !== 0 ? cmp : (a.createdAt || 0) - (b.createdAt || 0);
+    });
+
+  let runningBal = 0;
+  const displayRows = [];
+  txs.forEach(tx => {
+    const qty = Number(tx.qty);
+    runningBal += tx.type === 'IN' ? qty : -qty;
+    const inRange = (!from || tx.date >= from) && (!to || tx.date <= to);
+    if (inRange) displayRows.push({ tx, balance: runningBal });
+  });
+
+  const totalIn = txs.filter(t => t.type === 'IN').reduce((s, t) => s + Number(t.qty), 0);
+  const totalOut = txs.filter(t => t.type === 'OUT').reduce((s, t) => s + Number(t.qty), 0);
+
+  document.getElementById('ledgerBalance').textContent = runningBal;
+  document.getElementById('ledgerCount').textContent = txs.length;
+  document.getElementById('ledgerTotalIn').textContent = totalIn;
+  document.getElementById('ledgerTotalOut').textContent = totalOut;
+
+  const balEl = document.getElementById('ledgerBalance');
+  if (runningBal <= 0) balEl.className = 'text-red-200';
+  else if (runningBal <= 5) balEl.className = 'text-yellow-200';
+  else balEl.className = 'text-white';
+
+  const tbody = document.getElementById('ledgerTableBody');
+  const emptyEl = document.getElementById('ledgerEmpty');
+
+  if (displayRows.length === 0) {
+    tbody.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    emptyEl.textContent = txs.length === 0 ? 'No transactions yet.' : 'No transactions in selected range.';
+    return;
+  }
+  emptyEl.classList.add('hidden');
+
+  tbody.innerHTML = displayRows.map(({ tx, balance }) => {
+    const isIN = tx.type === 'IN';
+    return `
+      <tr class="hover:bg-slate-50">
+        <td class="px-2 py-2 text-slate-600 whitespace-nowrap text-xs">${formatDate(tx.date)}</td>
+        <td class="px-2 py-2 text-center">
+          <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${isIN ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+            ${isIN ? 'IN' : 'OUT'}
+          </span>
+        </td>
+        <td class="px-2 py-2 text-right font-medium ${isIN ? 'text-green-600' : 'text-red-600'} text-xs sm:text-sm">${isIN ? '+' : '-'}${tx.qty}</td>
+        <td class="px-2 py-2 text-right font-bold text-slate-800 text-xs sm:text-sm">${balance}</td>
+        <td class="px-2 py-2 text-slate-500 text-xs hidden sm:table-cell">${escapeHtml(tx.invoice) || '—'}</td>
+        <td class="px-2 py-2 text-slate-500 text-xs hidden sm:table-cell max-w-[150px] truncate">${escapeHtml(tx.note) || '—'}</td>
+        <td class="px-2 py-2 text-center no-print whitespace-nowrap">
+          <button onclick="openEditTx('${tx.id}')" class="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Edit">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <button onclick="deleteTx('${tx.id}')" class="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+document.getElementById('txForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const productId = state.currentLedgerId;
+  if (!productId) return;
+  const date = document.getElementById('txDate').value;
+  const qty = parseFloat(document.getElementById('txQty').value);
+  const note = document.getElementById('txNote').value.trim();
+  const invoice = document.getElementById('txInvoice').value.trim();
+
+  if (!date) { showToast('⚠️ Select a date'); return; }
+  if (!qty || qty <= 0) { showToast('⚠️ Enter valid quantity'); return; }
+  if (state.txType === 'OUT') {
+    const bal = getProductBalance(productId);
+    if (qty > bal) { showToast(`⚠️ Not enough! Available: ${bal}`); return; }
+  }
+
+  state.transactions.push({
+    id: uid(), productId, date, type: state.txType, qty, note, invoice, createdAt: Date.now()
+  });
+  saveData();
+  document.getElementById('txQty').value = '';
+  document.getElementById('txNote').value = '';
+  document.getElementById('txInvoice').value = '';
+  renderLedger();
+  renderDashboard();
+  showToast(`✅ Stock ${state.txType} added`);
+});
+
+function deleteTx(txId) {
+  const tx = state.transactions.find(t => t.id === txId);
+  if (!tx) return;
+  showConfirm('Delete this transaction?', () => {
+    state.transactions = state.transactions.filter(t => t.id !== txId);
+    saveData();
+    renderLedger();
+    renderDashboard();
+    pushUndo('deleteTx', { tx }, 'Transaction deleted');
+  });
+}
+
+/* ============================
+   EDIT TRANSACTION
+   ============================ */
+function openEditTx(txId) {
+  const tx = state.transactions.find(t => t.id === txId);
+  if (!tx) return;
+  document.getElementById('editTxId').value = tx.id;
+  document.getElementById('editTxType').value = tx.type;
+  document.getElementById('editTxDate').value = tx.date;
+  document.getElementById('editTxQty').value = tx.qty;
+  document.getElementById('editTxInvoice').value = tx.invoice || '';
+  document.getElementById('editTxNote').value = tx.note || '';
+  document.getElementById('editTxModal').classList.remove('hidden');
+}
+
+function closeEditTx() {
+  document.getElementById('editTxModal').classList.add('hidden');
+}
+
+document.getElementById('editTxForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const id = document.getElementById('editTxId').value;
+  const tx = state.transactions.find(t => t.id === id);
+  if (!tx) return;
+
+  const newType = document.getElementById('editTxType').value;
+  const newDate = document.getElementById('editTxDate').value;
+  const newQty = parseFloat(document.getElementById('editTxQty').value);
+  const newInvoice = document.getElementById('editTxInvoice').value.trim();
+  const newNote = document.getElementById('editTxNote').value.trim();
+
+  if (!newDate) { showToast('⚠️ Select a date'); return; }
+  if (!newQty || newQty <= 0) { showToast('⚠️ Enter valid quantity'); return; }
+
+  if (newType === 'OUT') {
+    const others = state.transactions.filter(t => t.id !== id && t.productId === tx.productId);
+    let balWithout = 0;
+    others.forEach(t => { balWithout += t.type === 'IN' ? Number(t.qty) : -Number(t.qty); });
+    if (newQty > balWithout) { showToast(`⚠️ Not enough! Max: ${balWithout}`); return; }
+  }
+
+  tx.type = newType;
+  tx.date = newDate;
+  tx.qty = newQty;
+  tx.invoice = newInvoice;
+  tx.note = newNote;
+  saveData();
+  closeEditTx();
+  renderLedger();
+  renderDashboard();
+  showToast('✅ Updated');
+});
+
+/* ============================
+   CONFIRM
+   ============================ */
+let confirmCallback = null;
+function showConfirm(msg, cb) {
+  document.getElementById('confirmMsg').textContent = msg;
+  document.getElementById('confirmModal').classList.remove('hidden');
+  confirmCallback = cb;
+}
+function closeConfirm() {
+  document.getElementById('confirmModal').classList.add('hidden');
+  confirmCallback = null;
+}
+document.getElementById('confirmBtn').addEventListener('click', () => {
+  if (confirmCallback) confirmCallback();
+  closeConfirm();
+});
+
+/* ============================
+   REPORTS
+   ============================ */
+function openReports() {
+  renderReports();
+  document.getElementById('reportsModal').classList.remove('hidden');
+  document.body.classList.add('modal-open');
+}
+function closeReports() {
+  document.getElementById('reportsModal').classList.add('hidden');
+  document.body.classList.remove('modal-open');
+}
+
+function getReportRange() {
+  const period = document.getElementById('reportPeriod').value;
+  if (period === 'all') return { from: '0000-01-01', to: '9999-12-31' };
+  const days = parseInt(period);
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - days);
+  const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return { from: fmt(from), to: fmt(to) };
+}
+
+function renderReports() {
+  const { from, to } = getReportRange();
+  const filteredTxs = state.transactions.filter(tx => tx.date >= from && tx.date <= to);
+  const inTxs = filteredTxs.filter(t => t.type === 'IN');
+  const outTxs = filteredTxs.filter(t => t.type === 'OUT');
+  const totalIn = inTxs.reduce((s, t) => s + Number(t.qty), 0);
+  const totalOut = outTxs.reduce((s, t) => s + Number(t.qty), 0);
+
+  document.getElementById('reportStats').innerHTML = `
+    <div class="bg-blue-50 rounded-xl p-3 border border-blue-100">
+      <p class="text-xs text-blue-600 font-medium">Total IN</p>
+      <p class="text-xl font-bold text-blue-700">${totalIn}</p>
+    </div>
+    <div class="bg-red-50 rounded-xl p-3 border border-red-100">
+      <p class="text-xs text-red-600 font-medium">Total OUT</p>
+      <p class="text-xl font-bold text-red-700">${totalOut}</p>
+    </div>
+    <div class="bg-green-50 rounded-xl p-3 border border-green-100">
+      <p class="text-xs text-green-600 font-medium">Net Change</p>
+      <p class="text-xl font-bold text-green-700">${totalIn - totalOut >= 0 ? '+' : ''}${totalIn - totalOut}</p>
+    </div>
+    <div class="bg-purple-50 rounded-xl p-3 border border-purple-100">
+      <p class="text-xs text-purple-600 font-medium">Transactions</p>
+      <p class="text-xl font-bold text-purple-700">${filteredTxs.length}</p>
+    </div>
+  `;
+
+  const map = {};
+  outTxs.forEach(tx => { map[tx.productId] = (map[tx.productId] || 0) + Number(tx.qty); });
+  const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const max = sorted.length > 0 ? sorted[0][1] : 1;
+  const topEl = document.getElementById('topProducts');
+  if (sorted.length === 0) {
+    topEl.innerHTML = '<p class="text-xs text-slate-400">No data</p>';
+  } else {
+    topEl.innerHTML = sorted.map(([pid, qty]) => {
+      const p = state.products.find(x => x.id === pid);
+      const name = p ? `${p.type}${p.colour ? ' • '+p.colour : ''}${p.size ? ' • '+p.size : ''}` : 'Deleted';
+      const pct = Math.round((qty / max) * 100);
+      return `
+        <div>
+          <div class="flex justify-between text-xs text-slate-600 mb-1">
+            <span class="truncate font-medium">${escapeHtml(name)}</span>
+            <span class="font-bold">${qty}</span>
+          </div>
+          <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full" style="width:${pct}%"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  const recent = state.transactions.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 20);
+  const recentEl = document.getElementById('recentActivity');
+  if (recent.length === 0) {
+    recentEl.innerHTML = '<p class="text-slate-400">No activity</p>';
+  } else {
+    recentEl.innerHTML = recent.map(tx => {
+      const p = state.products.find(x => x.id === tx.productId);
+      const name = p ? p.type : 'Deleted';
+      const isIN = tx.type === 'IN';
+      return `
+        <div class="flex items-center gap-2 py-1.5 border-b border-slate-100 last:border-0">
+          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${isIN ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${isIN ? 'IN' : 'OUT'}</span>
+          <span class="flex-1 truncate text-slate-600">${escapeHtml(name)}</span>
+          <span class="font-semibold ${isIN ? 'text-green-600' : 'text-red-600'}">${isIN ? '+' : '-'}${tx.qty}</span>
+          <span class="text-slate-400 text-[10px]">${formatDate(tx.date)}</span>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+/* ============================
+   EXPORT / BACKUP
+   ============================ */
+function downloadFile(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+
+function csvEscape(v) {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function exportLedgerCSV() {
+  const productId = state.currentLedgerId;
+  const p = state.products.find(x => x.id === productId);
+  if (!p) return;
+  const txs = state.transactions
+    .filter(t => t.productId === productId)
+    .sort((a, b) => (a.date + a.createdAt).localeCompare(b.date + b.createdAt));
+  let bal = 0;
+  let csv = 'Date,Type,Qty,Balance,Invoice,Note\n';
+  txs.forEach(tx => {
+    bal += tx.type === 'IN' ? Number(tx.qty) : -Number(tx.qty);
+    csv += [tx.date, tx.type, tx.qty, bal, csvEscape(tx.invoice), csvEscape(tx.note)].join(',') + '\n';
+  });
+  const name = `ledger_${(p.type||'product').replace(/\s+/g,'_')}_${todayStr()}.csv`;
+  downloadFile(name, csv, 'text/csv;charset=utf-8;');
+  showToast('📥 CSV downloaded');
+}
+
+function exportAllCSV() {
+  let csv = 'Product Type,Colour,Size,Qty,Threshold,Barcode\n';
+  state.products.forEach(p => {
+    csv += [csvEscape(p.type), csvEscape(p.colour), csvEscape(p.size), getProductBalance(p.id), getThreshold(p), csvEscape(p.barcode)].join(',') + '\n';
+  });
+  csv += '\n\nDate,Product,Type,Qty,Invoice,Note\n';
+  const sorted = state.transactions.slice().sort((a,b) => (a.date + a.createdAt).localeCompare(b.date + b.createdAt));
+  sorted.forEach(tx => {
+    const p = state.products.find(x => x.id === tx.productId);
+    const name = p ? `${p.type}${p.colour?' '+p.colour:''}${p.size?' '+p.size:''}` : 'Deleted';
+    csv += [tx.date, csvEscape(name), tx.type, tx.qty, csvEscape(tx.invoice), csvEscape(tx.note)].join(',') + '\n';
+  });
+  downloadFile(`inventory_full_${todayStr()}.csv`, csv, 'text/csv;charset=utf-8;');
+  showToast('📥 Full CSV downloaded');
+}
+
+function exportBackupJSON() {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    products: state.products,
+    transactions: state.transactions
+  };
+  downloadFile(`inventory_backup_${todayStr()}.json`, JSON.stringify(data, null, 2), 'application/json');
+  showToast('💾 Backup downloaded');
+}
+
+function restoreBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.products || !data.transactions) throw new Error('Invalid');
+      showConfirm('Restore backup? All current data will be replaced.', () => {
+        state.products = data.products || [];
+        state.transactions = data.transactions || [];
+        saveData();
+        renderAll();
+        closeBackup();
+        showToast('✅ Restored');
+      });
+    } catch (err) {
+      showToast('⚠️ Invalid backup file');
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function openBackup() {
+  document.getElementById('backupModal').classList.remove('hidden');
+  document.body.classList.add('modal-open');
+}
+function closeBackup() {
+  document.getElementById('backupModal').classList.add('hidden');
+  document.body.classList.remove('modal-open');
+}
+
+/* ============================
+   PRINT LEDGER
+   ============================ */
+function printLedger() {
+  const p = state.products.find(x => x.id === state.currentLedgerId);
+  if (!p) return;
+  const parts = [p.type];
+  if (p.colour) parts.push(p.colour);
+  if (p.size) parts.push(p.size);
+  const title = parts.join(' - ');
+
+  const header = document.createElement('div');
+  header.id = 'printHeader';
+  header.style.cssText = 'padding:12px;border-bottom:2px solid #000;margin-bottom:8px;';
+  header.innerHTML = `<h2 style="font-weight:bold;font-size:18px;">${escapeHtml(title)}</h2>
+    <p style="font-size:12px;color:#555;">Product Ledger — ${new Date().toLocaleString()}</p>`;
+  const printArea = document.getElementById('printArea');
+  printArea.insertBefore(header, printArea.firstChild);
+  window.print();
+  setTimeout(() => header.remove(), 500);
+}
+
+/* ============================
+   DOWNLOAD PDF (Ledger)
+   ============================ */
+function downloadLedgerPDF() {
+  const productId = state.currentLedgerId;
+  const p = state.products.find(x => x.id === productId);
+  if (!p) return;
+
+  const from = document.getElementById('ledgerFrom').value;
+  const to = document.getElementById('ledgerTo').value;
+
+  // Collect all txs sorted, compute running balance on all, filter for display
+  let txs = state.transactions
+    .filter(tx => tx.productId === productId)
+    .sort((a, b) => {
+      const cmp = (a.date || '').localeCompare(b.date || '');
+      return cmp !== 0 ? cmp : (a.createdAt || 0) - (b.createdAt || 0);
+    });
+
+  let bal = 0;
+  const displayRows = [];
+  let totalIn = 0, totalOut = 0;
+  txs.forEach(tx => {
+    const qty = Number(tx.qty);
+    if (tx.type === 'IN') totalIn += qty;
+    else totalOut += qty;
+    bal += tx.type === 'IN' ? qty : -qty;
+    const inRange = (!from || tx.date >= from) && (!to || tx.date <= to);
+    if (inRange) displayRows.push({ tx, balance: bal });
+  });
+
+  const titleParts = [p.type];
+  if (p.colour) titleParts.push(p.colour);
+  if (p.size) titleParts.push(p.size);
+  const title = titleParts.join(' - ');
+
+  const dateRangeText = (from || to)
+    ? `${from ? formatDate(from) : 'Beginning'} — ${to ? formatDate(to) : 'Today'}`
+    : 'All Time';
+
+  // Build HTML for PDF
+  const container = document.createElement('div');
+  container.style.cssText = 'padding:20px;background:#fff;font-family:Arial,sans-serif;color:#1e293b;width:100%;';
+
+  const rowsHtml = displayRows.length === 0
+    ? '<tr><td colspan="6" style="text-align:center;padding:20px;color:#94a3b8;">No transactions in this range</td></tr>'
+    : displayRows.map(({ tx, balance }) => {
+        const isIN = tx.type === 'IN';
+        const color = isIN ? '#15803d' : '#b91c1c';
+        const bg = isIN ? '#dcfce7' : '#fee2e2';
+        return `
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="padding:7px 8px;font-size:11px;color:#475569;">${formatDate(tx.date)}</td>
+            <td style="padding:7px 8px;text-align:center;">
+              <span style="font-size:10px;font-weight:bold;padding:2px 6px;border-radius:999px;background:${bg};color:${color};">${isIN ? 'IN' : 'OUT'}</span>
+            </td>
+            <td style="padding:7px 8px;text-align:right;font-weight:600;font-size:12px;color:${color};">${isIN ? '+' : '-'}${tx.qty}</td>
+            <td style="padding:7px 8px;text-align:right;font-weight:bold;font-size:12px;color:#1e293b;">${balance}</td>
+            <td style="padding:7px 8px;font-size:11px;color:#64748b;">${escapeHtml(tx.invoice) || '—'}</td>
+            <td style="padding:7px 8px;font-size:11px;color:#64748b;">${escapeHtml(tx.note) || '—'}</td>
+          </tr>
+        `;
+      }).join('');
+
+  container.innerHTML = `
+    <div class="pdf-header">
+      <h1>Product Ledger</h1>
+      <h2>${escapeHtml(title)}</h2>
+      <p>Generated: ${new Date().toLocaleString()}</p>
+    </div>
+    <div class="pdf-meta">
+      <span><b>Period:</b> ${dateRangeText}</span>
+      <span><b>Entries:</b> ${displayRows.length}</span>
+    </div>
+    <div class="pdf-summary">
+      <div class="in-box">
+        <div class="lbl">Total IN</div>
+        <div class="val">${totalIn}</div>
+      </div>
+      <div class="out-box">
+        <div class="lbl">Total OUT</div>
+        <div class="val">${totalOut}</div>
+      </div>
+      <div class="bal-box">
+        <div class="lbl">Balance</div>
+        <div class="val">${bal}</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <thead>
+        <tr style="background:#1e40af;color:#fff;">
+          <th style="padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;">Date</th>
+          <th style="padding:9px 8px;text-align:center;font-size:10px;text-transform:uppercase;">Type</th>
+          <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;">Qty</th>
+          <th style="padding:9px 8px;text-align:right;font-size:10px;text-transform:uppercase;">Balance</th>
+          <th style="padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;">Invoice</th>
+          <th style="padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;">Note</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div style="margin-top:20px;padding-top:10px;border-top:1px solid #cbd5e1;font-size:10px;color:#94a3b8;text-align:center;">
+      — End of Ledger —
+    </div>
+  `;
+
+  const opt = {
+    margin: [8, 8, 8, 8],
+    filename: `Ledger_${title.replace(/[^\w\u0980-\u09FF]+/g, '_')}_${todayStr()}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+  };
+
+  // Show loading
+  document.getElementById('pdfLoading').classList.remove('hidden');
+
+  html2pdf().set(opt).from(container).save().then(() => {
+    document.getElementById('pdfLoading').classList.add('hidden');
+    showToast('📄 PDF downloaded');
+  }).catch(err => {
+    document.getElementById('pdfLoading').classList.add('hidden');
+    showToast('⚠️ PDF failed: ' + err.message);
+  });
+}
+
+/* ============================
+   SCANNER
+   ============================ */
+let html5QrCode = null;
+function openScanner() {
+  document.getElementById('scannerModal').classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  setTimeout(() => {
+    html5QrCode = new Html5Qrcode("scannerReader");
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      onScanSuccess,
+      () => {}
+    ).catch(err => {
+      showToast('⚠️ Camera access denied');
+      closeScanner();
+    });
+  }, 200);
+}
+
+function closeScanner() {
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => { html5QrCode.clear(); html5QrCode = null; }).catch(() => {});
+  }
+  document.getElementById('scannerModal').classList.add('hidden');
+  document.body.classList.remove('modal-open');
+}
+
+function onScanSuccess(decodedText) {
+  const product = state.products.find(p => p.barcode && p.barcode === decodedText);
+  closeScanner();
+  if (product) {
+    showToast('✅ Found: ' + product.type);
+    setTimeout(() => openLedger(product.id), 300);
+  } else {
+    document.getElementById('searchInput').value = decodedText;
+    renderProducts();
+    showToast('Scanned: ' + decodedText + ' (not found)');
+  }
+}
+
+/* ============================
+   RENDER ALL
+   ============================ */
+function renderAll() {
+  refreshFilterOptions();
+  renderDashboard();
+  renderProducts();
+}
+
+/* ============================
+   EVENT LISTENERS
+   ============================ */
+document.getElementById('searchInput').addEventListener('input', renderProducts);
+
+document.getElementById('addProductModal').addEventListener('click', function(e) { if (e.target === this) closeAddProduct(); });
+document.getElementById('ledgerModal').addEventListener('click', function(e) { if (e.target === this) closeLedger(); });
+document.getElementById('confirmModal').addEventListener('click', function(e) { if (e.target === this) closeConfirm(); });
+document.getElementById('reportsModal').addEventListener('click', function(e) { if (e.target === this) closeReports(); });
+document.getElementById('backupModal').addEventListener('click', function(e) { if (e.target === this) closeBackup(); });
+document.getElementById('pinSettingsModal').addEventListener('click', function(e) { if (e.target === this) closePinSettings(); });
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    if (!document.getElementById('confirmModal').classList.contains('hidden')) closeConfirm();
+    else if (!document.getElementById('editTxModal').classList.contains('hidden')) closeEditTx();
+    else if (!document.getElementById('ledgerModal').classList.contains('hidden')) closeLedger();
+    else if (!document.getElementById('addProductModal').classList.contains('hidden')) closeAddProduct();
+    else if (!document.getElementById('reportsModal').classList.contains('hidden')) closeReports();
+    else if (!document.getElementById('backupModal').classList.contains('hidden')) closeBackup();
+    else if (!document.getElementById('pinSettingsModal').classList.contains('hidden')) closePinSettings();
+  }
+  if (!document.getElementById('lockScreen').classList.contains('hidden')) {
+    if (/^\d$/.test(e.key)) pinPress(e.key);
+    else if (e.key === 'Backspace') pinBack();
+    else if (e.key === 'Enter') checkPin();
+  }
+});
+
+/* ============================
+   INIT
+   ============================ */
+loadData();
+applyDark();
+renderAll();
+
+if (hasPin()) {
+  document.getElementById('lockNowBtn').classList.remove('hidden');
+  setTimeout(() => {
+    document.getElementById('lockScreen').classList.remove('hidden');
+    document.body.classList.add('modal-open');
+    renderPinDots();
+  }, 100);
+}
+
+// Seed demo data if empty
+if (state.products.length === 0) {
+  const demo = [
+    { type: 'Paints', colour: 'White', size: '20L', qty: 25 },
+    { type: 'Paints', colour: 'Red', size: '4L', qty: 3 },
+    { type: 'Primer', colour: 'White', size: '20L', qty: 12 },
+    { type: 'Colorant', colour: 'Blue', size: '1L', qty: 0 },
+    { type: 'Thinner', colour: '—', size: '5L', qty: 8 }
+  ];
+  demo.forEach(d => {
+    const p = { id: uid(), type: d.type, colour: d.colour === '—' ? '' : d.colour, size: d.size, threshold: 5, barcode: '', createdAt: Date.now() };
+    state.products.push(p);
+    if (d.qty > 0) {
+      state.transactions.push({
+        id: uid(), productId: p.id, date: todayStr(), type: 'IN', qty: d.qty, note: 'Opening stock', invoice: '', createdAt: Date.now()
+      });
+    }
+  });
+  saveData();
+  renderAll();
+}
+</script>
+</body>
+</html>
